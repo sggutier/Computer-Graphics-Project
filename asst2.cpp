@@ -189,8 +189,10 @@ static shared_ptr<Geometry> g_ground, g_cube;
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
 static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
 static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1,0,0)), Matrix4::makeTranslation(Cvec3(1,0,0))};  // currently only 1 obj is defined
+static Matrix4* g_curRbtP = &g_skyRbt;
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static int g_cubesCnt = 2;
+static int g_curRbtN = 2;
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -263,7 +265,7 @@ static void drawStuff() {
   sendProjectionMatrix(curSS, projmat);
 
   // use the skyRbt as the eyeRbt
-  const Matrix4 eyeRbt = g_skyRbt;
+  const Matrix4 eyeRbt = *g_curRbtP;
   const Matrix4 invEyeRbt = inv(eyeRbt);
 
   const Cvec3 eyeLight1 = Cvec3(invEyeRbt * Cvec4(g_light1, 1)); // g_light1 position in eye coordinates
@@ -370,6 +372,15 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     glFlush();
     writePpmScreenshot(g_windowWidth, g_windowHeight, "out.ppm");
     break;
+  case 'v':
+    g_curRbtN = (g_curRbtN+1) % (g_cubesCnt+1);
+    if( g_curRbtN == g_cubesCnt ) {
+      g_curRbtP = &g_skyRbt ;
+    }
+    else {
+      g_curRbtP = &g_objectRbt[g_curRbtN] ;
+    }
+    break ;
   case 'f':
     g_activeShader ^= 1;
     break;
