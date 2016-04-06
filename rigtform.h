@@ -17,15 +17,16 @@ public:
   }
 
   RigTForm(const Cvec3& t, const Quat& r) {
-    //TODO
+    t_ = t;
+    r_ = r;
   }
 
   explicit RigTForm(const Cvec3& t) {
-    // TODO
+    t_ = t;
   }
 
   explicit RigTForm(const Quat& r) {
-    // TODO
+    r_ = r;
   }
 
   Cvec3 getTranslation() const {
@@ -48,15 +49,17 @@ public:
 
   Cvec4 operator * (const Cvec4& a) const {
     // TODO
+    return a;
   }
 
   RigTForm operator * (const RigTForm& a) const {
-    // TODO
+    // self ->
+    return a;
   }
 };
 
 inline RigTForm inv(const RigTForm& tform) {
-  // TODO
+  return RigTForm(-tform.getTranslation(), inv(tform.getRotation()));
 }
 
 inline RigTForm transFact(const RigTForm& tform) {
@@ -67,9 +70,8 @@ inline RigTForm linFact(const RigTForm& tform) {
   return RigTForm(tform.getRotation());
 }
 
-inline Matrix4 rigTFormToMatrix(const RigTForm& tform) {
-  // TODO
-  return m;
+inline Matrix4 rigTFormToMatrix(const RigTForm& tform) {  
+  return Matrix4().makeTranslation(tform.getTranslation()) * quatToMatrix(tform.getRotation());
 }
 
 #endif
