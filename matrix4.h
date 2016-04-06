@@ -278,11 +278,21 @@ inline Matrix4 normalMatrix(const Matrix4& m) {
 }
 
 inline Matrix4 transFact(const Matrix4& m) {
-  // TODO
+  Matrix4 r;
+  for (int i = 0; i < 3; i++) {
+    r(i,3) = m(i,3);
+  }
+  return r;
 }
 
 inline Matrix4 linFact(const Matrix4& m) {
-  // TODO
+  Matrix4 r;
+  for (int i = 0; i < 3; i++) {
+    for (int j = 0; j < 3; j++) {
+      r(i,j) = m(i,j) ;
+    }
+  }
+  return r;
 }
 
 #endif
