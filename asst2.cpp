@@ -193,8 +193,10 @@ static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static int g_cubesCnt = 2;
 static int g_curEyeN = 2;
 static int g_curManpN = 0;
+static int g_curSkyManpN = 0;
 static Matrix4* g_curEyeP = &g_skyRbt;
 static Matrix4* g_curManpP = &g_objectRbt[0];
+static Matrix4 g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -367,6 +369,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     << "s\t\tsave screenshot\n"
     << "f\t\tToggle flat shading on/off.\n"
     << "o\t\tCycle object to edit\n"
+    << "m\t\tCycle between world and sky when editing sky camera\n"
     << "v\t\tCycle view\n"
     << "drag left mouse to rotate\n" << endl;
     break;
@@ -384,6 +387,35 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     else {
       g_curEyeP = &g_objectRbt[g_curEyeN] ;
       cout << "cube no. " << g_curEyeN+1 << endl;
+    }
+    break ;
+  case 'o':
+    cout << "Object currently manipulated is ";
+    g_curManpN = (g_curManpN+1) % (g_cubesCnt+1);
+    if( g_curManpN == g_cubesCnt ) {
+      g_curManpP = &g_skyRbt ;
+      g_editRbt = linFact(g_skyRbt);
+      g_curSkyManpN = 0;
+      cout << "sky camera" << endl;
+    }
+    else {
+      g_curManpP = &g_objectRbt[g_curManpN] ;
+      g_editRbt = transFact(*g_curManpP) * linFact(*g_curEyeP);
+      cout << "cube no. " << g_curManpN+1 << endl;
+    }
+    break ;
+  case 'm':
+    if( g_curManpN != g_cubesCnt )
+      break ;
+    cout << "Currently manipulating ";
+    g_curSkyManpN = (g_curSkyManpN + 1) % 2 ;
+    if (g_curSkyManpN == 1) {
+      cout << "world" << endl;
+      g_editRbt = g_skyRbt;
+    }
+    else {
+      cout << "sky" << endl;
+      g_editRbt = linFact(g_skyRbt);
     }
     break ;
   case 'f':
