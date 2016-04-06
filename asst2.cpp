@@ -189,10 +189,12 @@ static shared_ptr<Geometry> g_ground, g_cube;
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
 static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
 static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1,0,0)), Matrix4::makeTranslation(Cvec3(1,0,0))};  // currently only 1 obj is defined
-static Matrix4* g_curEyeP = &g_skyRbt;
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static int g_cubesCnt = 2;
 static int g_curEyeN = 2;
+static int g_curManpN = 0;
+static Matrix4* g_curEyeP = &g_skyRbt;
+static Matrix4* g_curManpP = &g_objectRbt[0];
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -373,12 +375,15 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     writePpmScreenshot(g_windowWidth, g_windowHeight, "out.ppm");
     break;
   case 'v':
+    cout << "Current eye now is ";
     g_curEyeN = (g_curRbtN+1) % (g_cubesCnt+1);
     if( g_curRbtN == g_cubesCnt ) {
       g_curRbtP = &g_skyRbt ;
+      cout << "sky camera" << endl;
     }
     else {
       g_curRbtP = &g_objectRbt[g_curRbtN] ;
+      cout << "cube no. " << g_curRbtN+1 << endl;
     }
     break ;
   case 'f':
