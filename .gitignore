@@ -1,3 +1,7 @@
 *.o
 *.bin
 *.ppm
+GPATH
+GRTAGS
+GSYMS
+GTAGS
