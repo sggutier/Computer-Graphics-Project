@@ -376,14 +376,14 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break;
   case 'v':
     cout << "Current eye now is ";
-    g_curEyeN = (g_curRbtN+1) % (g_cubesCnt+1);
-    if( g_curRbtN == g_cubesCnt ) {
-      g_curRbtP = &g_skyRbt ;
+    g_curEyeN = (g_curEyeN+1) % (g_cubesCnt+1);
+    if( g_curEyeN == g_cubesCnt ) {
+      g_curEyeP = &g_skyRbt ;
       cout << "sky camera" << endl;
     }
     else {
-      g_curRbtP = &g_objectRbt[g_curRbtN] ;
-      cout << "cube no. " << g_curRbtN+1 << endl;
+      g_curEyeP = &g_objectRbt[g_curEyeN] ;
+      cout << "cube no. " << g_curEyeN+1 << endl;
     }
     break ;
   case 'f':
