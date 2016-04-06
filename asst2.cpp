@@ -192,10 +192,10 @@ static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1,0,0)), Matrix
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static int g_cubesCnt = 2;
 static int g_curEyeN = 2;
-static int g_curManpN = 0;
+static int g_curManpN = 2;
 static int g_curSkyManpN = 0;
 static Matrix4* g_curEyeP = &g_skyRbt;
-static Matrix4* g_curManpP = &g_objectRbt[0];
+static Matrix4* g_curManpP = &g_skyRbt;
 static Matrix4 g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
@@ -252,6 +252,28 @@ static void updateFrustFovY() {
     const double RAD_PER_DEG = 0.5 * CS175_PI/180;
     g_frustFovY = atan2(sin(g_frustMinFov * RAD_PER_DEG) * g_windowHeight / g_windowWidth, cos(g_frustMinFov * RAD_PER_DEG)) / RAD_PER_DEG;
   }
+}
+
+// update the matrix needed for transforming the current object
+static void updateEditingMatrix() {
+  if (g_curManpN == g_cubesCnt) {
+    if (g_curSkyManpN == -1) {
+      g_curSkyManpN = 0;
+    }
+    if (g_curSkyManpN == 0) {
+      // If current eye is sky camera and frame is word-sky frame
+      g_editRbt = linFact(g_skyRbt);
+    }
+    else {
+      // If current eye is sky camera and frame is sky camera
+      g_editRbt = g_skyRbt;
+    }
+  }
+  else {
+    // If current eye is anything and manipulated object is a cube
+    g_editRbt = transFact(*g_curManpP) * linFact(*g_curEyeP);
+    g_curSkyManpN = -1;
+  }  
 }
 
 static Matrix4 makeProjectionMatrix() {
@@ -319,22 +341,35 @@ static void reshape(const int w, const int h) {
 }
 
 static void motion(const int x, const int y) {
-  const double dx = x - g_mouseClickX;
-  const double dy = g_windowHeight - y - 1 - g_mouseClickY;
+  if (g_curManpN == g_cubesCnt and g_curEyeN != g_cubesCnt) {
+    return;
+  }
+  double dx = x - g_mouseClickX;
+  double dy = g_windowHeight - y - 1 - g_mouseClickY;
 
   Matrix4 m;
   if (g_mouseLClickButton && !g_mouseRClickButton) { // left button down?
+    if (g_curManpN == g_curEyeN) {
+      dy *= -1, dx *= -1;
+    }
     m = Matrix4::makeXRotation(-dy) * Matrix4::makeYRotation(dx);
   }
   else if (g_mouseRClickButton && !g_mouseLClickButton) { // right button down?
+    if (g_curSkyManpN == 0) {
+      dy *= -1, dx *= -1;
+    }
     m = Matrix4::makeTranslation(Cvec3(dx, dy, 0) * 0.01);
   }
   else if (g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)) {  // middle or (left and right) button down?
+    if (g_curSkyManpN == 0) {
+      dy *= -1, dx *= -1;
+    }
     m = Matrix4::makeTranslation(Cvec3(0, 0, -dy) * 0.01);
   }
 
   if (g_mouseClickDown) {
-    g_objectRbt[0] *= m; // Simply right-multiply is WRONG
+    *g_curManpP = g_editRbt * m * inv(g_editRbt) * (*g_curManpP);
+    updateEditingMatrix();
     glutPostRedisplay(); // we always redraw if we changed the scene
   }
 
@@ -388,35 +423,35 @@ static void keyboard(const unsigned char key, const int x, const int y) {
       g_curEyeP = &g_objectRbt[g_curEyeN] ;
       cout << "cube no. " << g_curEyeN+1 << endl;
     }
+    updateEditingMatrix();
     break ;
   case 'o':
     cout << "Object currently manipulated is ";
     g_curManpN = (g_curManpN+1) % (g_cubesCnt+1);
     if( g_curManpN == g_cubesCnt ) {
       g_curManpP = &g_skyRbt ;
-      g_editRbt = linFact(g_skyRbt);
-      g_curSkyManpN = 0;
       cout << "sky camera" << endl;
     }
     else {
       g_curManpP = &g_objectRbt[g_curManpN] ;
-      g_editRbt = transFact(*g_curManpP) * linFact(*g_curEyeP);
       cout << "cube no. " << g_curManpN+1 << endl;
     }
+    updateEditingMatrix();
     break ;
   case 'm':
-    if( g_curManpN != g_cubesCnt )
+    if( g_curManpN != g_cubesCnt ) {
+      cout << "Currently not manipulating sky frame" << endl ;
       break ;
+    }
     cout << "Currently manipulating ";
     g_curSkyManpN = (g_curSkyManpN + 1) % 2 ;
-    if (g_curSkyManpN == 1) {
+    if (g_curSkyManpN == 0) {
       cout << "world" << endl;
-      g_editRbt = g_skyRbt;
     }
     else {
       cout << "sky" << endl;
-      g_editRbt = linFact(g_skyRbt);
     }
+    updateEditingMatrix();
     break ;
   case 'f':
     g_activeShader ^= 1;
