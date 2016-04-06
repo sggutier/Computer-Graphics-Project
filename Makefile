@@ -28,7 +28,7 @@ CXX = g++
 OBJ = $(BASE).o ppm.o glsupport.o
 
 $(BASE): $(OBJ)
-	$(LINK.cpp) -o $@ $^ $(LIBS) -lGLEW 
+	$(LINK.cpp) -o $@.bin $^ $(LIBS) -lGLEW 
 
 clean:
-	rm -f $(OBJ) $(BASE)
+	rm -f $(OBJ) $(BASE).bin
