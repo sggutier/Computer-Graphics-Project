@@ -292,8 +292,8 @@ static void drawStuff() {
   sendProjectionMatrix(curSS, projmat);
 
   // use the skyRbt as the eyeRbt
-  const Matrix4 eyeRbt = rigTFormToMatrix(*g_curEyeP);
-  const Matrix4 invEyeRbt = inv(eyeRbt);
+  const RigTForm eyeRbt = *g_curEyeP;
+  const RigTForm invEyeRbt = inv(eyeRbt);
 
   const Cvec3 eyeLight1 = Cvec3(invEyeRbt * Cvec4(g_light1, 1)); // g_light1 position in eye coordinates
   const Cvec3 eyeLight2 = Cvec3(invEyeRbt * Cvec4(g_light2, 1)); // g_light2 position in eye coordinates
@@ -303,8 +303,8 @@ static void drawStuff() {
   // draw ground
   // ===========
   //
-  const Matrix4 groundRbt = Matrix4();  // identity
-  Matrix4 MVM = invEyeRbt * groundRbt;
+  const RigTForm groundRbt = RigTForm();  // identity
+  Matrix4 MVM = rigTFormToMatrix(invEyeRbt * groundRbt);
   Matrix4 NMVM = normalMatrix(MVM);
   sendModelViewNormalMatrix(curSS, MVM, NMVM);
   safe_glUniform3f(curSS.h_uColor, 0.1, 0.95, 0.1); // set color
@@ -313,7 +313,7 @@ static void drawStuff() {
   // draw cubes
   // ==========
   for (int i = 0; i < g_cubesCnt; i++) {
-      MVM = invEyeRbt * rigTFormToMatrix(g_objectRbt[i]);
+      MVM = rigTFormToMatrix(invEyeRbt * g_objectRbt[i]);
       NMVM = normalMatrix(MVM);
       sendModelViewNormalMatrix(curSS, MVM, NMVM);
       safe_glUniform3f(curSS.h_uColor, g_objectColors[i][0], g_objectColors[i][1], g_objectColors[i][2]);
