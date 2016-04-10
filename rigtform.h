@@ -48,13 +48,14 @@ public:
   }
 
   Cvec4 operator * (const Cvec4& a) const {
-    // TODO
-    return a;
+    const Cvec4 ans = this->r_ * a + Cvec4(this->t_);
+    return ans ;
   }
 
   RigTForm operator * (const RigTForm& a) const {
-    // self ->
-    return a;
+    const RigTForm ans = RigTForm(this->t_ + Cvec3(this->r_*Cvec4(a.getTranslation())),
+                                  this->r_ * a.getRotation());
+    return ans;
   }
 };
 
