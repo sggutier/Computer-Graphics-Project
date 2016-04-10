@@ -188,16 +188,16 @@ static shared_ptr<Geometry> g_ground, g_cube;
 // --------- Scene
 
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
-static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
-static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1,0,0)), Matrix4::makeTranslation(Cvec3(1,0,0))};  // currently only 1 obj is defined
+static RigTForm g_skyRbt = RigTForm(Cvec3(0.0, 0.25, 4.0));
+static RigTForm g_objectRbt[2] = {RigTForm(Cvec3(-1,0,0)), RigTForm(Cvec3(1,0,0))};  // currently only 1 obj is defined
 static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static int g_cubesCnt = 2;
 static int g_curEyeN = 2;
 static int g_curManpN = 2;
 static int g_curSkyManpN = 0;
-static Matrix4* g_curEyeP = &g_skyRbt;
-static Matrix4* g_curManpP = &g_skyRbt;
-static Matrix4 g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
+static RigTForm* g_curEyeP = &g_skyRbt;
+static RigTForm* g_curManpP = &g_skyRbt;
+static RigTForm g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -292,7 +292,7 @@ static void drawStuff() {
   sendProjectionMatrix(curSS, projmat);
 
   // use the skyRbt as the eyeRbt
-  const Matrix4 eyeRbt = *g_curEyeP;
+  const Matrix4 eyeRbt = rigTFormToMatrix(*g_curEyeP);
   const Matrix4 invEyeRbt = inv(eyeRbt);
 
   const Cvec3 eyeLight1 = Cvec3(invEyeRbt * Cvec4(g_light1, 1)); // g_light1 position in eye coordinates
@@ -313,7 +313,7 @@ static void drawStuff() {
   // draw cubes
   // ==========
   for (int i = 0; i < g_cubesCnt; i++) {
-      MVM = invEyeRbt * g_objectRbt[i];
+      MVM = invEyeRbt * rigTFormToMatrix(g_objectRbt[i]);
       NMVM = normalMatrix(MVM);
       sendModelViewNormalMatrix(curSS, MVM, NMVM);
       safe_glUniform3f(curSS.h_uColor, g_objectColors[i][0], g_objectColors[i][1], g_objectColors[i][2]);
@@ -348,28 +348,29 @@ static void motion(const int x, const int y) {
   double dx = x - g_mouseClickX;
   double dy = g_windowHeight - y - 1 - g_mouseClickY;
 
-  Matrix4 m;
+  Quat mr_;
+  Cvec3 mt_;
   if (g_mouseLClickButton && !g_mouseRClickButton) { // left button down?
     if (g_curManpN == g_curEyeN) {
       dy *= -1, dx *= -1;
     }
-    m = Matrix4::makeXRotation(-dy) * Matrix4::makeYRotation(dx);
+    mr_ = Quat::makeXRotation(-dy) * Quat::makeYRotation(dx);
   }
   else if (g_mouseRClickButton && !g_mouseLClickButton) { // right button down?
     if (g_curSkyManpN == 0) {
       dy *= -1, dx *= -1;
     }
-    m = Matrix4::makeTranslation(Cvec3(dx, dy, 0) * 0.01);
+    mt_ = Cvec3(dx, dy, 0) * 0.01;
   }
   else if (g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)) {  // middle or (left and right) button down?
     if (g_curSkyManpN == 0) {
       dy *= -1, dx *= -1;
     }
-    m = Matrix4::makeTranslation(Cvec3(0, 0, -dy) * 0.01);
+    mt_ = Cvec3(0, 0, -dy) * 0.01;
   }
 
   if (g_mouseClickDown) {
-    *g_curManpP = g_editRbt * m * inv(g_editRbt) * (*g_curManpP);
+    *g_curManpP = g_editRbt * RigTForm(mt_)*RigTForm(mr_) * inv(g_editRbt) * (*g_curManpP);
     updateEditingMatrix();
     glutPostRedisplay(); // we always redraw if we changed the scene
   }
