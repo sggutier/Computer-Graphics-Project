@@ -370,7 +370,7 @@ static void motion(const int x, const int y) {
   }
 
   if (g_mouseClickDown) {
-    *g_curManpP = g_editRbt * RigTForm(mt_)*RigTForm(mr_) * inv(g_editRbt) * (*g_curManpP);
+    *g_curManpP = g_editRbt * RigTForm(mt_, mr_) * inv(g_editRbt) * (*g_curManpP);
     updateEditingMatrix();
     glutPostRedisplay(); // we always redraw if we changed the scene
   }
