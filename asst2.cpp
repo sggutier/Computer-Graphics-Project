@@ -273,6 +273,17 @@ static void updateFrustFovY() {
   }
 }
 
+static bool mouseDepthPressedP() {
+  return g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton);
+}
+
+static bool drawArcballP() {
+  return
+    (g_curSkyManpN == 0 || g_curManpN != g_curEyeN)
+    && !mouseDepthPressedP()
+    && !(g_curManpN == g_cubesCnt and g_curEyeN != g_cubesCnt);
+}
+
 // update the matrix needed for transforming the current object
 static void updateEditingMatrix() {
   if (g_curManpN == g_cubesCnt) {
@@ -321,7 +332,7 @@ static void drawStuff() {
   }
   //draw cube if manipulating sky camera respect to world coordinate system
   // or manipulating cube respect to other cube
-  if (g_curSkyManpN == 0 || g_curManpN != g_curEyeN) {
+  if (drawArcballP()) {
     g_arcballScale = getScreenToEyeScale((invEyeRbt*sphereRbt).getTranslation()[2],
                                          g_frustFovY,
                                          g_windowHeight);
@@ -406,7 +417,7 @@ static void motion(const int x, const int y) {
     }
     mt_ = Cvec3(dx, dy, 0) * 0.01;
   }
-  else if (g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton)) {  // middle or (left and right) button down?
+  else if (mouseDepthPressedP()) {  // middle or (left and right) button down?
     if (g_curSkyManpN == 0) {
       dy *= -1, dx *= -1;
     }
@@ -437,6 +448,8 @@ static void mouse(const int button, const int state, const int x, const int y) {
   g_mouseMClickButton &= !(button == GLUT_MIDDLE_BUTTON && state == GLUT_UP);
 
   g_mouseClickDown = g_mouseLClickButton || g_mouseRClickButton || g_mouseMClickButton;
+
+  glutPostRedisplay();
 }
 
 
