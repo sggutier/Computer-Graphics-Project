@@ -27,6 +27,7 @@
 #include "ppm.h"
 #include "glsupport.h"
 #include "rigtform.h"
+#include "arcball.h"
 
 using namespace std;      // for string, vector, iostream, and other standard C++ stuff
 using namespace tr1; // for shared_ptr
@@ -183,7 +184,7 @@ struct Geometry {
 
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
-static shared_ptr<Geometry> g_ground, g_cubes[2];
+static shared_ptr<Geometry> g_ground, g_cubes[2], g_sphere;
 
 // --------- Scene
 
@@ -191,10 +192,12 @@ static const int g_cubesCnt = 2;
 static int g_curEyeN = 2;
 static int g_curManpN = 2;
 static int g_curSkyManpN = 0;
+static double g_arcballScale = 1.0, g_arcballScreenRadius = 1.0;
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
 static RigTForm g_skyRbt = RigTForm(Cvec3(0.0, 0.25, 4.0));
 static RigTForm g_objectRbt[g_cubesCnt] = {RigTForm(Cvec3(-1,0,0)), RigTForm(Cvec3(1,0,0))};  // currently only 1 obj is defined
 static Cvec3f g_objectColors[g_cubesCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
+static Cvec3f g_sphereColors = Cvec3f(0, 1, 0);
 static RigTForm* g_curEyeP = &g_skyRbt;
 static RigTForm* g_curManpP = &g_skyRbt;
 static RigTForm g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
@@ -228,6 +231,19 @@ static void initCubes() {
     makeCube(1, vtx.begin(), idx.begin());
     g_cubes[i].reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
   }
+}
+
+static void initSphere() {
+  int ibLen, vbLen;
+  const int slices = 25, stacks = 25 ;
+  getSphereVbIbLen(slices, stacks, vbLen, ibLen);
+
+  // Temporary storage for sphere geometry
+  vector<VertexPN> vtx(vbLen);
+  vector<unsigned short> idx(ibLen);
+
+  makeSphere(1, slices, stacks, vtx.begin(), idx.begin());
+  g_sphere.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
 }
 
 // takes a projection matrix and send to the the shaders
@@ -297,6 +313,20 @@ static void drawStuff() {
   const RigTForm eyeRbt = *g_curEyeP;
   const RigTForm invEyeRbt = inv(eyeRbt);
 
+  // recalculate current radius of sphere
+  RigTForm sphereRbt ;
+  if (g_curSkyManpN != 0) {
+    sphereRbt = *g_curManpP ;
+  }
+  //draw cube if manipulating sky camera respect to world coordinate system
+  // or manipulating cube respect to other cube
+  if (g_curSkyManpN == 0 || g_curManpN != g_curEyeN) {
+    g_arcballScale = getScreenToEyeScale((invEyeRbt*sphereRbt).getTranslation()[2],
+                                         g_frustFovY,
+                                         g_windowHeight);
+  }
+
+
   const Cvec3 eyeLight1 = Cvec3(invEyeRbt * Cvec4(g_light1, 1)); // g_light1 position in eye coordinates
   const Cvec3 eyeLight2 = Cvec3(invEyeRbt * Cvec4(g_light2, 1)); // g_light2 position in eye coordinates
   safe_glUniform3f(curSS.h_uLight, eyeLight1[0], eyeLight1[1], eyeLight1[2]);
@@ -321,6 +351,16 @@ static void drawStuff() {
       safe_glUniform3f(curSS.h_uColor, g_objectColors[i][0], g_objectColors[i][1], g_objectColors[i][2]);
       g_cubes[i]->draw(curSS);
   }
+
+    // draw sphere
+  // ==========
+  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+  MVM = rigTFormToMatrix(invEyeRbt * sphereRbt) * Matrix4::makeScale(g_arcballScale * g_arcballScreenRadius);
+  NMVM = normalMatrix(MVM);
+  sendModelViewNormalMatrix(curSS, MVM, NMVM);
+  safe_glUniform3f(curSS.h_uColor, g_sphereColors[0], g_sphereColors[1], g_sphereColors[2]);
+  g_sphere->draw(curSS);
+  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 }
 
 static void display() {
@@ -340,6 +380,7 @@ static void reshape(const int w, const int h) {
   glViewport(0, 0, w, h);
   cerr << "Size of window is now " << w << "x" << h << endl;
   updateFrustFovY();
+  g_arcballScreenRadius = 0.25 * min(g_windowWidth, g_windowHeight);
   glutPostRedisplay();
 }
 
@@ -504,6 +545,7 @@ static void initShaders() {
 static void initGeometry() {
   initGround();
   initCubes();
+  initSphere();
 }
 
 int main(int argc, char * argv[]) {
