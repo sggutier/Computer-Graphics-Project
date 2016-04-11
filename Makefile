@@ -25,7 +25,7 @@ endif
 
 CXX = g++ 
 
-OBJ = $(BASE).o ppm.o glsupport.o
+OBJ = $(BASE).o ppm.o glsupport.o scenegraph.o picker.o
 
 $(BASE): $(OBJ)
 	$(LINK.cpp) -o $@.bin $^ $(LIBS) -lGLEW 
