@@ -316,7 +316,8 @@ static void drawStuff() {
   // recalculate current radius of sphere
   RigTForm sphereRbt ;
   if (g_curSkyManpN != 0) {
-    sphereRbt = *g_curManpP ;
+    // put sphere on object unless manipulating world - otherwise, put it at the center of the world
+    sphereRbt = *g_curManpP ; 
   }
   //draw cube if manipulating sky camera respect to world coordinate system
   // or manipulating cube respect to other cube
