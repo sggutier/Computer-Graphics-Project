@@ -8,15 +8,15 @@ using namespace std::tr1;
 Picker::Picker(const RigTForm& initialRbt, const ShaderState& curSS)
   : drawer_(initialRbt, curSS)
   , idCounter_(0)
-  , srgbFrameBuffer_(true) {} // originally had gl2Compatible
+  , srgbFrameBuffer_(g_Gl2Compatible) {} 
 
 bool Picker::visit(SgTransformNode& node) {
-  // TODO
+  nodeStack_.push_back(node.shared_from_this());
   return drawer_.visit(node);
 }
 
 bool Picker::postVisit(SgTransformNode& node) {
-  // TODO
+  nodeStack_.pop_back();
   return drawer_.postVisit(node);
 }
 
