@@ -182,18 +182,18 @@ struct Geometry {
 
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
-static shared_ptr<Geometry> g_ground, g_cube;
+static shared_ptr<Geometry> g_ground, g_cubes[2];
 
 // --------- Scene
 
-static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
-static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
-static Matrix4 g_objectRbt[2] = {Matrix4::makeTranslation(Cvec3(-1,0,0)), Matrix4::makeTranslation(Cvec3(1,0,0))};  // currently only 1 obj is defined
-static Cvec3f g_objectColors[2] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
-static int g_cubesCnt = 2;
+static const int g_cubesCnt = 2;
 static int g_curEyeN = 2;
 static int g_curManpN = 2;
 static int g_curSkyManpN = 0;
+static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
+static Matrix4 g_skyRbt = Matrix4::makeTranslation(Cvec3(0.0, 0.25, 4.0));
+static Matrix4 g_objectRbt[g_cubesCnt] = {Matrix4::makeTranslation(Cvec3(-1,0,0)), Matrix4::makeTranslation(Cvec3(1,0,0))};  // currently only 1 obj is defined
+static Cvec3f g_objectColors[g_cubesCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static Matrix4* g_curEyeP = &g_skyRbt;
 static Matrix4* g_curManpP = &g_skyRbt;
 static Matrix4 g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
@@ -219,12 +219,14 @@ static void initCubes() {
   int ibLen, vbLen;
   getCubeVbIbLen(vbLen, ibLen);
 
-  // Temporary storage for cube geometry
-  vector<VertexPN> vtx(vbLen);
-  vector<unsigned short> idx(ibLen);
+  for (int i=0; i<2; i++) {
+    // Temporary storage for cube geometry
+    vector<VertexPN> vtx(vbLen);
+    vector<unsigned short> idx(ibLen);
 
-  makeCube(1, vtx.begin(), idx.begin());
-  g_cube.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
+    makeCube(1, vtx.begin(), idx.begin());
+    g_cubes[i].reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
+  }
 }
 
 // takes a projection matrix and send to the the shaders
@@ -316,7 +318,7 @@ static void drawStuff() {
       NMVM = normalMatrix(MVM);
       sendModelViewNormalMatrix(curSS, MVM, NMVM);
       safe_glUniform3f(curSS.h_uColor, g_objectColors[i][0], g_objectColors[i][1], g_objectColors[i][2]);
-      g_cube->draw(curSS);
+      g_cubes[i]->draw(curSS);
   }
 }
 
