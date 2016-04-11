@@ -8,7 +8,7 @@ using namespace std::tr1;
 Picker::Picker(const RigTForm& initialRbt, const ShaderState& curSS)
   : drawer_(initialRbt, curSS)
   , idCounter_(0)
-  , srgbFrameBuffer_(!g_Gl2Compatible) {}
+  , srgbFrameBuffer_(true) {} // originally had gl2Compatible
 
 bool Picker::visit(SgTransformNode& node) {
   // TODO
