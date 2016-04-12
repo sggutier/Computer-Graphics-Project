@@ -21,18 +21,20 @@ bool Picker::postVisit(SgTransformNode& node) {
 }
 
 bool Picker::visit(SgShapeNode& node) {
-  // TODO
+  addToMap(++idCounter_, dynamic_pointer_cast<SgRbtNode>(nodeStack_.back()));
+  Cvec3 c = idToColor(idCounter_);
+  safe_glUniform3f(drawer_.getCurSS().h_uColor, color[0], color[1], color[2]);
   return drawer_.visit(node);
 }
 
 bool Picker::postVisit(SgShapeNode& node) {
-  // TODO
   return drawer_.postVisit(node);
 }
 
 shared_ptr<SgRbtNode> Picker::getRbtNodeAtXY(int x, int y) {
-  // TODO
-  return shared_ptr<SgRbtNode>(); // return null for now
+  PackedPixel image;
+  glReadPixels(x, y, 1, 1, GL_RGB, GL_UNSIGNED_BYTE, &image);
+  return find(colorToId(image));
 }
 
 //------------------
