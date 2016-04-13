@@ -294,7 +294,8 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
     Matrix4 NMVM = normalMatrix(MVM);
     sendModelViewNormalMatrix(curSS, MVM, NMVM);
     safe_glUniform3f(curSS.h_uColor, g_sphereColors[0], g_sphereColors[1], g_sphereColors[2]);
-    g_sphere->draw(curSS);
+    if (!(g_curEyeN != g_robotCnt && g_currentPickedRbtNode == g_skyNode)) 
+      g_sphere->draw(curSS);
     glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
   }
   else {
