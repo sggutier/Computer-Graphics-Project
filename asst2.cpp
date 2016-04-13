@@ -451,10 +451,11 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     cout << "Current eye now is ";
     g_curEyeN = (g_curEyeN+1) % (g_robotCnt+1);
     if( g_curEyeN == g_robotCnt ) {
-      g_skyPatch = 1;
+      g_skyPatch = (g_currentPickedRbtNode==g_skyNode? 1 : 0);
       cout << "sky camera" << endl;
     }
     else {
+      g_skyPatch = 0;
       cout << "robot no. " << g_curEyeN+1 << endl;
     }
     break ;
