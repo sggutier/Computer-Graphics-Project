@@ -41,7 +41,7 @@ public:
 
   const RigTForm getAccumulatedRbt(int offsetFromStackTop = 0) {
     RigTForm ans ;
-    for (int i=rbtStack_().size()-1-offsetFromStackTop; i>=0; i--) {
+    for (int i=rbtStack_.size()-1-offsetFromStackTop; i>=0; i--) {
       ans = rbtStack_[i] * ans;
     }
     return ans;
