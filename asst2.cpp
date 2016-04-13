@@ -228,19 +228,26 @@ static void updateFrustFovY() {
   }
 }
 
+static Matrix4 makeProjectionMatrix() {
+  return Matrix4::makeProjection(
+           g_frustFovY, g_windowWidth / static_cast <double> (g_windowHeight),
+           g_frustNear, g_frustFar);
+}
+
+static inline shared_ptr<SgRbtNode> getEyeNode() {
+  return g_curEyeN == g_robotCnt? g_skyNode : g_robotNodes[g_curEyeN];
+}
+
+static inline RigTForm doMtoOwrtA(RigTForm M, RigTForm L, RigTForm editRbt) {
+  return editRbt * M * inv(editRbt) * L;
+}
+
 static bool mouseDepthPressedP() {
   return g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton);
 }
 
 static bool drawArcballP() {
-  return
-    !mouseDepthPressedP() ;
-}
-
-static Matrix4 makeProjectionMatrix() {
-  return Matrix4::makeProjection(
-           g_frustFovY, g_windowWidth / static_cast <double> (g_windowHeight),
-           g_frustNear, g_frustFar);
+  return !mouseDepthPressedP() && (g_currentPickedRbtNode==g_skyNode || g_currentPickedRbtNode != getEyeNode());
 }
 
 static void drawStuff(const ShaderState& curSS, bool picking) {
@@ -249,7 +256,7 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
   sendProjectionMatrix(curSS, projmat);
 
   // use the skyRbt as the eyeRbt
-  const RigTForm eyeRbt = getPathAccumRbt(g_world, g_skyNode);
+  const RigTForm eyeRbt = getPathAccumRbt(g_world, getEyeNode());
   const RigTForm invEyeRbt = inv(eyeRbt);
 
   // recalculate current radius of sphere
@@ -293,6 +300,8 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
     g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
     if (g_currentPickedRbtNode == g_groundNode)
       g_currentPickedRbtNode = shared_ptr<SgRbtNode>();   // set to NULL
+    if (g_currentPickedRbtNode == NULL)
+      g_currentPickedRbtNode = g_skyNode;
   }
 }
 
@@ -341,14 +350,6 @@ static void reshape(const int w, const int h) {
   glutPostRedisplay();
 }
 
-static inline shared_ptr<SgRbtNode> getEyeNode() {
-  return g_curEyeN == g_robotCnt? g_skyNode : g_robotNodes[g_curEyeN];
-}
-
-static inline RigTForm doMtoOwrtA(RigTForm M, RigTForm L, RigTForm editRbt) {
-  return editRbt * M * inv(editRbt) * L;
-}
-
 static void motion(const int x, const int y) {
   double dx = x - g_mouseClickX;
   double dy = g_windowHeight - y - 1 - g_mouseClickY;
@@ -362,9 +363,15 @@ static void motion(const int x, const int y) {
     mr_ = Quat::makeXRotation(-dy) * Quat::makeYRotation(dx);
   }
   else if (g_mouseRClickButton && !g_mouseLClickButton) { // right button down?
+    if (g_currentPickedRbtNode == g_skyNode) {
+      dy *= -1, dx *= -1;
+    }
     mt_ = Cvec3(dx, dy, 0) * 0.01;
   }
   else if (mouseDepthPressedP()) {  // middle or (left and right) button down?
+    if (g_currentPickedRbtNode == g_skyNode) {
+      dy *= -1, dx *= -1;
+    }
     mt_ = Cvec3(0, 0, -dy) * 0.01;
   }
 
