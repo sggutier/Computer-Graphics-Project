@@ -176,6 +176,8 @@ static shared_ptr<SgRootNode> g_world;
 static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robot1Node, g_robot2Node;
 static shared_ptr<SgRbtNode> g_currentPickedRbtNode; // used later when you do picking
 
+bool g_mousePicking = false;
+
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
 
@@ -325,6 +327,30 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
   }
 }
 
+static void pick() {
+  // We need to set the clear color to black, for pick rendering.
+  // so let's save the clear color
+  GLdouble clearColor[4];
+  glGetDoublev(GL_COLOR_CLEAR_VALUE, clearColor);
+
+  glClearColor(0, 0, 0, 0);
+
+  // using PICKING_SHADER as the shader
+  glUseProgram(g_shaderStates[PICKING_SHADER]->program);
+
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  drawStuff(*g_shaderStates[PICKING_SHADER], true);
+
+  // Uncomment below and comment out the glutPostRedisplay in mouse(...) call back
+  // to see result of the pick rendering pass
+  // glutSwapBuffers();
+
+  //Now set back the clear color
+  glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+
+  checkGlErrors();
+}
+
 static void display() {
   glUseProgram(g_shaderStates[g_activeShader]->program);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);                   // clear framebuffer color&depth
@@ -399,6 +425,12 @@ static void mouse(const int button, const int state, const int x, const int y) {
 
   g_mouseClickDown = g_mouseLClickButton || g_mouseRClickButton || g_mouseMClickButton;
 
+  if (g_mousePicking) {
+    cout << "Object picked!" << endl;
+    pick();
+    g_mousePicking = false;
+  }
+
   glutPostRedisplay();
 }
 
@@ -434,19 +466,10 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     }
     updateEditingMatrix();
     break ;
-  case 'o':
-    cout << "Object currently manipulated is ";
-    g_curManpN = (g_curManpN+1) % (g_cubesCnt+1);
-    if( g_curManpN == g_cubesCnt ) {
-      g_curManpP = &g_skyRbt ;
-      cout << "sky camera" << endl;
-    }
-    else {
-      g_curManpP = &g_objectRbt[g_curManpN] ;
-      cout << "cube no. " << g_curManpN+1 << endl;
-    }
-    updateEditingMatrix();
-    break ;
+  case 'p':
+    cout << "Please pick an object with the mouse" << endl;
+    g_mousePicking = true;
+    break;
   case 'm':
     if( g_curManpN != g_cubesCnt ) {
       cout << "Currently not manipulating sky frame" << endl ;
