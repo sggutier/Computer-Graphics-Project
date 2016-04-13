@@ -160,6 +160,7 @@ static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
 
 static const int g_robotCnt = 2;
 static int g_curEyeN = 2;
+static int g_skyPatch = 1; // Set as 1 if manipulating sky-sky frame - 0 if manipulating sky-eye frame - (-1) otherwise
 static double g_arcballScale = 1.0, g_arcballScreenRadius = 1.0;
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
 static Cvec3f g_objectColors[g_robotCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
@@ -264,13 +265,13 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
 
   // recalculate current radius of sphere
   RigTForm sphereRbt ;
-  if (g_currentPickedRbtNode != g_skyNode) {
+  if (g_skyPatch == 0) {
     // put sphere on object unless manipulating world - otherwise, put it at the center of the world
     sphereRbt = getPathAccumRbt(g_world, g_currentPickedRbtNode);
   }
-  //draw cube if manipulating sky camera respect to world coordinate system
+  // draw arcball if manipulating sky camera respect to world coordinate system
   // or manipulating cube respect to other cube
-  if (drawArcballP()) {
+  if (drawArcballP() && g_skyPatch != 0) {
     g_arcballScale = getScreenToEyeScale((invEyeRbt*sphereRbt).getTranslation()[2],
                                          g_frustFovY,
                                          g_windowHeight);
@@ -303,8 +304,13 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
     g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
     if (g_currentPickedRbtNode == g_groundNode)
       g_currentPickedRbtNode = shared_ptr<SgRbtNode>();   // set to NULL
-    if (g_currentPickedRbtNode == NULL)
+    if (g_currentPickedRbtNode == NULL) {
       g_currentPickedRbtNode = g_skyNode;
+      g_skyPatch = 1;
+    }
+    else {
+      g_skyPatch = 0;
+    }
   }
 }
 
@@ -382,8 +388,7 @@ static void motion(const int x, const int y) {
   }
 
   if (g_mouseClickDown) {
-    int skyPatch = (g_currentPickedRbtNode == g_skyNode? 1 : 0);
-    RigTForm editRbt = RigTForm(getPathAccumRbt(g_world, g_currentPickedRbtNode, skyPatch).getTranslation(),
+    RigTForm editRbt = RigTForm(getPathAccumRbt(g_world, g_currentPickedRbtNode, g_skyPatch).getTranslation(),
                                 getPathAccumRbt(g_world, getEyeNode()).getRotation());
     // ^ That thing is the matrix centered at the object being manipulated and some rotation convenient to the current view
     RigTForm Cs = getPathAccumRbt(g_world, g_currentPickedRbtNode, 1);
@@ -446,6 +451,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     cout << "Current eye now is ";
     g_curEyeN = (g_curEyeN+1) % (g_robotCnt+1);
     if( g_curEyeN == g_robotCnt ) {
+      g_skyPatch = 1;
       cout << "sky camera" << endl;
     }
     else {
@@ -456,6 +462,20 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     cout << "Please pick an object with the mouse" << endl;
     g_mousePicking = true;
     break;
+  case 'm':
+    if( g_currentPickedRbtNode != g_skyNode ) {
+      cout << "Currently not manipulating sky frame" << endl ;
+      break ;
+    }
+    cout << "Currently manipulating ";
+    g_skyPatch = 1 - g_skyPatch;
+    if (g_skyPatch == 1) {
+      cout << "world" << endl;
+    }
+    else {
+      cout << "sky" << endl;
+    }
+    break ;
   case 'f':
     g_activeShader ^= 1;
     break;
