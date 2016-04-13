@@ -28,6 +28,10 @@
 #include "glsupport.h"
 #include "rigtform.h"
 #include "arcball.h"
+#include "asstcommon.h"
+#include "scenegraph.h"
+#include "drawer.h"
+#include "picker.h"
 
 using namespace std;      // for string, vector, iostream, and other standard C++ stuff
 using namespace tr1; // for shared_ptr
@@ -49,7 +53,7 @@ using namespace tr1; // for shared_ptr
 // To complete the assignment you only need to edit the shader files that get
 // loaded
 // ----------------------------------------------------------------------------
-static const bool g_Gl2Compatible = false;
+const bool g_Gl2Compatible = false;
 
 
 static const float g_frustMinFov = 60.0;  // A minimal of 60 degree field of view
@@ -67,52 +71,17 @@ static bool g_mouseLClickButton, g_mouseRClickButton, g_mouseMClickButton;
 static int g_mouseClickX, g_mouseClickY; // coordinates for mouse click event
 static int g_activeShader = 0;
 
-struct ShaderState {
-  GlProgram program;
-
-  // Handles to uniform variables
-  GLint h_uLight, h_uLight2;
-  GLint h_uProjMatrix;
-  GLint h_uModelViewMatrix;
-  GLint h_uNormalMatrix;
-  GLint h_uColor;
-
-  // Handles to vertex attributes
-  GLint h_aPosition;
-  GLint h_aNormal;
-
-  ShaderState(const char* vsfn, const char* fsfn) {
-    readAndCompileShader(program, vsfn, fsfn);
-
-    const GLuint h = program; // short hand
-
-    // Retrieve handles to uniform variables
-    h_uLight = safe_glGetUniformLocation(h, "uLight");
-    h_uLight2 = safe_glGetUniformLocation(h, "uLight2");
-    h_uProjMatrix = safe_glGetUniformLocation(h, "uProjMatrix");
-    h_uModelViewMatrix = safe_glGetUniformLocation(h, "uModelViewMatrix");
-    h_uNormalMatrix = safe_glGetUniformLocation(h, "uNormalMatrix");
-    h_uColor = safe_glGetUniformLocation(h, "uColor");
-
-    // Retrieve handles to vertex attributes
-    h_aPosition = safe_glGetAttribLocation(h, "aPosition");
-    h_aNormal = safe_glGetAttribLocation(h, "aNormal");
-
-    if (!g_Gl2Compatible)
-      glBindFragDataLocation(h, 0, "fragColor");
-    checkGlErrors();
-  }
-
-};
-
-static const int g_numShaders = 2;
+static const int PICKING_SHADER = 2; // index of the picking shader is g_shaerFiles
+static const int g_numShaders = 3;
 static const char * const g_shaderFiles[g_numShaders][2] = {
   {"./shaders/basic-gl3.vshader", "./shaders/diffuse-gl3.fshader"},
-  {"./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader"}
+  {"./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader"},
+  {"./shaders/basic-gl3.vshader", "./shaders/pick-gl3.fshader"}
 };
 static const char * const g_shaderFilesGl2[g_numShaders][2] = {
   {"./shaders/basic-gl2.vshader", "./shaders/diffuse-gl2.fshader"},
-  {"./shaders/basic-gl2.vshader", "./shaders/solid-gl2.fshader"}
+  {"./shaders/basic-gl2.vshader", "./shaders/solid-gl2.fshader"},
+  {"./shaders/basic-gl2.vshader", "./shaders/pick-gl2.fshader"}
 };
 static vector<shared_ptr<ShaderState> > g_shaderStates; // our global shader states
 
@@ -182,30 +151,29 @@ struct Geometry {
   }
 };
 
+typedef SgGeometryShapeNode<Geometry> MyShapeNode;
 
 // Vertex buffer and index buffer associated with the ground and cube geometry
-static shared_ptr<Geometry> g_ground, g_cubes[2], g_sphere;
+static shared_ptr<Geometry> g_ground, g_cube, g_sphere;
 
 // --------- Scene
 
-static const int g_cubesCnt = 2;
+static const int g_robotCnt = 2;
 static int g_curEyeN = 2;
-static int g_curManpN = 2;
-static int g_curSkyManpN = 0;
+static int g_skyPatch = 1; // Set as 1 if manipulating sky-sky frame - 0 if manipulating sky-eye frame - (-1) otherwise
 static double g_arcballScale = 1.0, g_arcballScreenRadius = 1.0;
 static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
-static RigTForm g_skyRbt = RigTForm(Cvec3(0.0, 0.25, 4.0));
-static RigTForm g_objectRbt[g_cubesCnt] = {RigTForm(Cvec3(-1,0,0)), RigTForm(Cvec3(1,0,0))};  // currently only 1 obj is defined
-static Cvec3f g_objectColors[g_cubesCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
+static Cvec3f g_objectColors[g_robotCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static Cvec3f g_sphereColors = Cvec3f(0, 1, 0);
-static RigTForm* g_curEyeP = &g_skyRbt;
-static RigTForm* g_curManpP = &g_skyRbt;
-static RigTForm g_editRbt = transFact(g_objectRbt[0]) * linFact(g_skyRbt); // Manipulated-Eye frame; initialized as cube1-eye frame
+
+static shared_ptr<SgRootNode> g_world;
+static shared_ptr<SgRbtNode> g_skyNode, g_groundNode, g_robotNodes[2];
+static shared_ptr<SgRbtNode> g_currentPickedRbtNode; // used later when you do picking
+
+bool g_mousePicking = false;
+
 
 ///////////////// END OF G L O B A L S //////////////////////////////////////////////////
-
-
-
 
 static void initGround() {
   // A x-z plane at y = g_groundY of dimension [-g_groundSize, g_groundSize]^2
@@ -223,14 +191,12 @@ static void initCubes() {
   int ibLen, vbLen;
   getCubeVbIbLen(vbLen, ibLen);
 
-  for (int i=0; i<2; i++) {
-    // Temporary storage for cube geometry
-    vector<VertexPN> vtx(vbLen);
-    vector<unsigned short> idx(ibLen);
+  // Temporary storage for cube geometry
+  vector<VertexPN> vtx(vbLen);
+  vector<unsigned short> idx(ibLen);
 
-    makeCube(1, vtx.begin(), idx.begin());
-    g_cubes[i].reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
-  }
+  makeCube(1, vtx.begin(), idx.begin());
+  g_cube.reset(new Geometry(&vtx[0], &idx[0], vbLen, ibLen));
 }
 
 static void initSphere() {
@@ -253,16 +219,6 @@ static void sendProjectionMatrix(const ShaderState& curSS, const Matrix4& projMa
   safe_glUniformMatrix4fv(curSS.h_uProjMatrix, glmatrix);
 }
 
-// takes MVM and its normal matrix to the shaders
-static void sendModelViewNormalMatrix(const ShaderState& curSS, const Matrix4& MVM, const Matrix4& NMVM) {
-  GLfloat glmatrix[16];
-  MVM.writeToColumnMajorMatrix(glmatrix); // send MVM
-  safe_glUniformMatrix4fv(curSS.h_uModelViewMatrix, glmatrix);
-
-  NMVM.writeToColumnMajorMatrix(glmatrix); // send NMVM
-  safe_glUniformMatrix4fv(curSS.h_uNormalMatrix, glmatrix);
-}
-
 // update g_frustFovY from g_frustMinFov, g_windowWidth, and g_windowHeight
 static void updateFrustFovY() {
   if (g_windowWidth >= g_windowHeight)
@@ -273,66 +229,49 @@ static void updateFrustFovY() {
   }
 }
 
-static bool mouseDepthPressedP() {
-  return g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton);
-}
-
-static bool drawArcballP() {
-  return
-    (g_curSkyManpN == 0 || g_curManpN != g_curEyeN)
-    && !mouseDepthPressedP()
-    && !(g_curManpN == g_cubesCnt and g_curEyeN != g_cubesCnt);
-}
-
-// update the matrix needed for transforming the current object
-static void updateEditingMatrix() {
-  if (g_curManpN == g_cubesCnt) {
-    if (g_curSkyManpN == -1) {
-      g_curSkyManpN = 0;
-    }
-    if (g_curSkyManpN == 0) {
-      // If current eye is sky camera and frame is word-sky frame
-      g_editRbt = linFact(g_skyRbt);
-    }
-    else {
-      // If current eye is sky camera and frame is sky camera
-      g_editRbt = g_skyRbt;
-    }
-  }
-  else {
-    // If current eye is anything and manipulated object is a cube
-    g_editRbt = transFact(*g_curManpP) * linFact(*g_curEyeP);
-    g_curSkyManpN = -1;
-  }  
-}
-
 static Matrix4 makeProjectionMatrix() {
   return Matrix4::makeProjection(
            g_frustFovY, g_windowWidth / static_cast <double> (g_windowHeight),
            g_frustNear, g_frustFar);
 }
 
-static void drawStuff() {
-  // short hand for current shader state
-  const ShaderState& curSS = *g_shaderStates[g_activeShader];
+static inline shared_ptr<SgRbtNode> getEyeNode() {
+  return g_curEyeN == g_robotCnt? g_skyNode : g_robotNodes[g_curEyeN];
+}
 
+static inline RigTForm doMtoOwrtA(RigTForm M, RigTForm L, RigTForm editRbt) {
+  return editRbt * M * inv(editRbt) * L;
+}
+
+static bool mouseDepthPressedP() {
+  return g_mouseMClickButton || (g_mouseLClickButton && g_mouseRClickButton);
+}
+
+static bool drawArcballP() {
+  return
+    !mouseDepthPressedP() &&
+    !(g_curEyeN != g_robotCnt && g_currentPickedRbtNode == g_skyNode) &&
+    (getEyeNode()==g_skyNode || g_currentPickedRbtNode != getEyeNode());
+}
+
+static void drawStuff(const ShaderState& curSS, bool picking) {
   // build & send proj. matrix to vshader
   const Matrix4 projmat = makeProjectionMatrix();
   sendProjectionMatrix(curSS, projmat);
 
   // use the skyRbt as the eyeRbt
-  const RigTForm eyeRbt = *g_curEyeP;
+  const RigTForm eyeRbt = getPathAccumRbt(g_world, getEyeNode());
   const RigTForm invEyeRbt = inv(eyeRbt);
 
   // recalculate current radius of sphere
   RigTForm sphereRbt ;
-  if (g_curSkyManpN != 0) {
+  if (g_skyPatch == 0) {
     // put sphere on object unless manipulating world - otherwise, put it at the center of the world
-    sphereRbt = *g_curManpP ; 
+    sphereRbt = getPathAccumRbt(g_world, g_currentPickedRbtNode);
   }
-  //draw cube if manipulating sky camera respect to world coordinate system
+  // draw arcball if manipulating sky camera respect to world coordinate system
   // or manipulating cube respect to other cube
-  if (drawArcballP()) {
+  if (drawArcballP() && g_skyPatch != 0) {
     g_arcballScale = getScreenToEyeScale((invEyeRbt*sphereRbt).getTranslation()[2],
                                          g_frustFovY,
                                          g_windowHeight);
@@ -344,42 +283,66 @@ static void drawStuff() {
   safe_glUniform3f(curSS.h_uLight, eyeLight1[0], eyeLight1[1], eyeLight1[2]);
   safe_glUniform3f(curSS.h_uLight2, eyeLight2[0], eyeLight2[1], eyeLight2[2]);
 
-  // draw ground
-  // ===========
-  //
-  const RigTForm groundRbt = RigTForm();  // identity
-  Matrix4 MVM = rigTFormToMatrix(invEyeRbt * groundRbt);
-  Matrix4 NMVM = normalMatrix(MVM);
-  sendModelViewNormalMatrix(curSS, MVM, NMVM);
-  safe_glUniform3f(curSS.h_uColor, 0.1, 0.95, 0.1); // set color
-  g_ground->draw(curSS);
+  if (!picking) {
+    Drawer drawer(invEyeRbt, curSS);
+    g_world->accept(drawer);
 
-  // draw cubes
-  // ==========
-  for (int i = 0; i < g_cubesCnt; i++) {
-      MVM = rigTFormToMatrix(invEyeRbt * g_objectRbt[i]);
-      NMVM = normalMatrix(MVM);
-      sendModelViewNormalMatrix(curSS, MVM, NMVM);
-      safe_glUniform3f(curSS.h_uColor, g_objectColors[i][0], g_objectColors[i][1], g_objectColors[i][2]);
-      g_cubes[i]->draw(curSS);
+    // draw arcball
+    // ==========
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    Matrix4 MVM = rigTFormToMatrix(invEyeRbt * sphereRbt) * Matrix4::makeScale(g_arcballScale * g_arcballScreenRadius);
+    Matrix4 NMVM = normalMatrix(MVM);
+    sendModelViewNormalMatrix(curSS, MVM, NMVM);
+    safe_glUniform3f(curSS.h_uColor, g_sphereColors[0], g_sphereColors[1], g_sphereColors[2]);
+    g_sphere->draw(curSS);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
   }
+  else {
+    Picker picker(invEyeRbt, curSS);
+    g_world->accept(picker);
+    glFlush();
+    g_currentPickedRbtNode = picker.getRbtNodeAtXY(g_mouseClickX, g_mouseClickY);
+    if (g_currentPickedRbtNode == g_groundNode)
+      g_currentPickedRbtNode = shared_ptr<SgRbtNode>();   // set to NULL
+    if (g_currentPickedRbtNode == NULL) {
+      g_currentPickedRbtNode = g_skyNode;
+      g_skyPatch = 1;
+    }
+    else {
+      g_skyPatch = 0;
+    }
+  }
+}
 
-    // draw sphere
-  // ==========
-  glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-  MVM = rigTFormToMatrix(invEyeRbt * sphereRbt) * Matrix4::makeScale(g_arcballScale * g_arcballScreenRadius);
-  NMVM = normalMatrix(MVM);
-  sendModelViewNormalMatrix(curSS, MVM, NMVM);
-  safe_glUniform3f(curSS.h_uColor, g_sphereColors[0], g_sphereColors[1], g_sphereColors[2]);
-  g_sphere->draw(curSS);
-  glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+static void pick() {
+  // We need to set the clear color to black, for pick rendering.
+  // so let's save the clear color
+  GLdouble clearColor[4];
+  glGetDoublev(GL_COLOR_CLEAR_VALUE, clearColor);
+
+  glClearColor(0, 0, 0, 0);
+
+  // using PICKING_SHADER as the shader
+  glUseProgram(g_shaderStates[PICKING_SHADER]->program);
+
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+  drawStuff(*g_shaderStates[PICKING_SHADER], true);
+
+  // Uncomment below and comment out the glutPostRedisplay in mouse(...) call back
+  // to see result of the pick rendering pass
+  // glutSwapBuffers();
+
+  //Now set back the clear color
+  glClearColor(clearColor[0], clearColor[1], clearColor[2], clearColor[3]);
+
+  checkGlErrors();
 }
 
 static void display() {
   glUseProgram(g_shaderStates[g_activeShader]->program);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);                   // clear framebuffer color&depth
 
-  drawStuff();
+  drawStuff(*g_shaderStates[g_activeShader], false);
 
   glutSwapBuffers();                                    // show the back buffer (where we rendered stuff)
 
@@ -397,7 +360,7 @@ static void reshape(const int w, const int h) {
 }
 
 static void motion(const int x, const int y) {
-  if (g_curManpN == g_cubesCnt and g_curEyeN != g_cubesCnt) {
+  if (g_curEyeN != g_robotCnt && g_currentPickedRbtNode == g_skyNode) {
     return;
   }
   double dx = x - g_mouseClickX;
@@ -406,27 +369,34 @@ static void motion(const int x, const int y) {
   Quat mr_;
   Cvec3 mt_;
   if (g_mouseLClickButton && !g_mouseRClickButton) { // left button down?
-    if (g_curManpN == g_curEyeN) {
+    if (g_currentPickedRbtNode == getEyeNode()) {
       dy *= -1, dx *= -1;
     }
     mr_ = Quat::makeXRotation(-dy) * Quat::makeYRotation(dx);
   }
   else if (g_mouseRClickButton && !g_mouseLClickButton) { // right button down?
-    if (g_curSkyManpN == 0) {
+    if (g_currentPickedRbtNode == g_skyNode) {
       dy *= -1, dx *= -1;
     }
     mt_ = Cvec3(dx, dy, 0) * 0.01;
   }
   else if (mouseDepthPressedP()) {  // middle or (left and right) button down?
-    if (g_curSkyManpN == 0) {
+    if (g_currentPickedRbtNode == g_skyNode) {
       dy *= -1, dx *= -1;
     }
     mt_ = Cvec3(0, 0, -dy) * 0.01;
   }
 
   if (g_mouseClickDown) {
-    *g_curManpP = g_editRbt * RigTForm(mt_, mr_) * inv(g_editRbt) * (*g_curManpP);
-    updateEditingMatrix();
+    RigTForm editRbt = RigTForm(getPathAccumRbt(g_world, g_currentPickedRbtNode, g_skyPatch).getTranslation(),
+                                getPathAccumRbt(g_world, getEyeNode()).getRotation());
+    // ^ That thing is the matrix centered at the object being manipulated and some rotation convenient to the current view
+    RigTForm Cs = getPathAccumRbt(g_world, g_currentPickedRbtNode, 1);
+    // ^ This is the rigid transform of the articulation that is just behind the current object
+    g_currentPickedRbtNode->setRbt(doMtoOwrtA(RigTForm(mt_, mr_),
+                                              g_currentPickedRbtNode->getRbt(),
+                                              inv(Cs)*editRbt));
+    // ^ Gets local rigid transform for currently manipulated object
     glutPostRedisplay(); // we always redraw if we changed the scene
   }
 
@@ -448,6 +418,12 @@ static void mouse(const int button, const int state, const int x, const int y) {
   g_mouseMClickButton &= !(button == GLUT_MIDDLE_BUTTON && state == GLUT_UP);
 
   g_mouseClickDown = g_mouseLClickButton || g_mouseRClickButton || g_mouseMClickButton;
+
+  if (g_mousePicking) {
+    cout << "Object picked!" << endl;
+    pick();
+    g_mousePicking = false;
+  }
 
   glutPostRedisplay();
 }
@@ -473,44 +449,32 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break;
   case 'v':
     cout << "Current eye now is ";
-    g_curEyeN = (g_curEyeN+1) % (g_cubesCnt+1);
-    if( g_curEyeN == g_cubesCnt ) {
-      g_curEyeP = &g_skyRbt ;
+    g_curEyeN = (g_curEyeN+1) % (g_robotCnt+1);
+    if( g_curEyeN == g_robotCnt ) {
+      g_skyPatch = 1;
       cout << "sky camera" << endl;
     }
     else {
-      g_curEyeP = &g_objectRbt[g_curEyeN] ;
-      cout << "cube no. " << g_curEyeN+1 << endl;
+      cout << "robot no. " << g_curEyeN+1 << endl;
     }
-    updateEditingMatrix();
     break ;
-  case 'o':
-    cout << "Object currently manipulated is ";
-    g_curManpN = (g_curManpN+1) % (g_cubesCnt+1);
-    if( g_curManpN == g_cubesCnt ) {
-      g_curManpP = &g_skyRbt ;
-      cout << "sky camera" << endl;
-    }
-    else {
-      g_curManpP = &g_objectRbt[g_curManpN] ;
-      cout << "cube no. " << g_curManpN+1 << endl;
-    }
-    updateEditingMatrix();
-    break ;
+  case 'p':
+    cout << "Please pick an object with the mouse" << endl;
+    g_mousePicking = true;
+    break;
   case 'm':
-    if( g_curManpN != g_cubesCnt ) {
+    if( g_currentPickedRbtNode != g_skyNode ) {
       cout << "Currently not manipulating sky frame" << endl ;
       break ;
     }
     cout << "Currently manipulating ";
-    g_curSkyManpN = (g_curSkyManpN + 1) % 2 ;
-    if (g_curSkyManpN == 0) {
+    g_skyPatch = 1 - g_skyPatch;
+    if (g_skyPatch == 1) {
       cout << "world" << endl;
     }
     else {
       cout << "sky" << endl;
     }
-    updateEditingMatrix();
     break ;
   case 'f':
     g_activeShader ^= 1;
@@ -562,6 +526,105 @@ static void initGeometry() {
   initSphere();
 }
 
+static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color) {
+
+  const double ARM_LEN = 0.7,
+               ARM_THICK = 0.25,
+               FOREARM_LEN = 0.7,
+               FOREARM_THICK = 0.17,
+               LEG_LEN = 0.9,
+               LEG_THICK = 0.30,
+               CALF_LEN = 0.8,
+               CALF_THICK = 0.20,
+               THIGH_THICK = 0.20,
+               HEAD_DIAM = 0.30,
+               TORSO_LEN = 1.2,
+               TORSO_THICK = 0.25,
+               TORSO_WIDTH = 1;
+  const int NUM_JOINTS = 10,
+            NUM_SHAPES = 10 ;
+
+  struct JointDesc {
+    int parent;
+    float x, y, z;
+  };
+
+  JointDesc jointDesc[NUM_JOINTS] = {
+    {-1}, // torso
+    {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper right arm
+    {1,  ARM_LEN, 0, 0}, // lower right arm
+    {0,  -TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper left arm
+    {3,  -ARM_LEN, 0, 0}, // upper left arm
+    {0,  TORSO_WIDTH/2 - THIGH_THICK, -TORSO_LEN/2, 0}, // upper right leg
+    {5,  0, -LEG_LEN, 0}, // lower right leg
+    {0,  -TORSO_WIDTH/2 + THIGH_THICK, -TORSO_LEN/2, 0}, // upper right leg
+    {7,  0, -LEG_LEN, 0}, // lower right leg
+    {0,  0, TORSO_LEN/2 + HEAD_DIAM/2, 0} // head
+  };
+
+  struct ShapeDesc {
+    int parentJointId;
+    float x, y, z, sx, sy, sz;
+    shared_ptr<Geometry> geometry;
+  };
+
+  ShapeDesc shapeDesc[NUM_SHAPES] = {
+    {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
+    {1, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper right arm
+    {2, ARM_LEN/2, 0, 0, FOREARM_LEN, FOREARM_THICK, ARM_THICK, g_cube}, // lower right arm
+    {3, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper left arm
+    {4, -ARM_LEN/2, 0, 0, FOREARM_LEN, FOREARM_THICK, ARM_THICK, g_cube}, // lower left arm
+    {5, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper right leg
+    {6, 0, -CALF_LEN/2, 0, LEG_THICK, CALF_LEN, CALF_THICK, g_cube}, // lower right leg
+    {7, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper left leg
+    {8, 0, -CALF_LEN/2, 0, LEG_THICK, CALF_LEN, CALF_THICK, g_cube}, // lower left leg
+    {9, 0, HEAD_DIAM/2, 0, HEAD_DIAM, HEAD_DIAM, HEAD_DIAM, g_sphere} // head
+  };
+
+  shared_ptr<SgTransformNode> jointNodes[NUM_JOINTS];
+
+  for (int i = 0; i < NUM_JOINTS; ++i) {
+    if (jointDesc[i].parent == -1)
+      jointNodes[i] = base;
+    else {
+      jointNodes[i].reset(new SgRbtNode(RigTForm(Cvec3(jointDesc[i].x, jointDesc[i].y, jointDesc[i].z))));
+      jointNodes[jointDesc[i].parent]->addChild(jointNodes[i]);
+    }
+  }
+  for (int i = 0; i < NUM_SHAPES; ++i) {
+    shared_ptr<MyShapeNode> shape(
+      new MyShapeNode(shapeDesc[i].geometry,
+                      color,
+                      Cvec3(shapeDesc[i].x, shapeDesc[i].y, shapeDesc[i].z),
+                      Cvec3(0, 0, 0),
+                      Cvec3(shapeDesc[i].sx, shapeDesc[i].sy, shapeDesc[i].sz)));
+    jointNodes[shapeDesc[i].parentJointId]->addChild(shape);
+  }
+}
+
+static void initScene() {
+  g_world.reset(new SgRootNode());
+
+  g_skyNode.reset(new SgRbtNode(RigTForm(Cvec3(0.0, 0.25, 4.0))));
+
+  g_groundNode.reset(new SgRbtNode());
+  g_groundNode->addChild(shared_ptr<MyShapeNode>(
+                           new MyShapeNode(g_ground, Cvec3(0.1, 0.95, 0.1))));
+
+  g_robotNodes[0].reset(new SgRbtNode(RigTForm(Cvec3(-2, 1, 0))));
+  g_robotNodes[1].reset(new SgRbtNode(RigTForm(Cvec3(2, 1, 0))));
+
+  constructRobot(g_robotNodes[0], Cvec3(1, 0, 0)); // a Red robot
+  constructRobot(g_robotNodes[1], Cvec3(0, 0, 1)); // a Blue robot
+
+  g_world->addChild(g_skyNode);
+  g_world->addChild(g_groundNode);
+  g_world->addChild(g_robotNodes[0]);
+  g_world->addChild(g_robotNodes[1]);
+
+  g_currentPickedRbtNode = g_skyNode;
+}
+
 int main(int argc, char * argv[]) {
   try {
     initGlutState(argc,argv);
@@ -577,6 +640,7 @@ int main(int argc, char * argv[]) {
     initGLState();
     initShaders();
     initGeometry();
+    initScene();
 
     glutMainLoop();
     return 0;
