@@ -530,11 +530,19 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
 
   const double ARM_LEN = 0.7,
                ARM_THICK = 0.25,
-               TORSO_LEN = 1.5,
+               FOREARM_LEN = 0.7,
+               FOREARM_THICK = 0.17,
+               LEG_LEN = 0.9,
+               LEG_THICK = 0.30,
+               CALF_LEN = 0.8,
+               CALF_THICK = 0.20,
+               THIGH_THICK = 0.20,
+               HEAD_DIAM = 0.30,
+               TORSO_LEN = 1.2,
                TORSO_THICK = 0.25,
                TORSO_WIDTH = 1;
-  const int NUM_JOINTS = 3,
-            NUM_SHAPES = 3;
+  const int NUM_JOINTS = 10,
+            NUM_SHAPES = 10 ;
 
   struct JointDesc {
     int parent;
@@ -545,6 +553,13 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
     {-1}, // torso
     {0,  TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper right arm
     {1,  ARM_LEN, 0, 0}, // lower right arm
+    {0,  -TORSO_WIDTH/2, TORSO_LEN/2, 0}, // upper left arm
+    {3,  -ARM_LEN, 0, 0}, // upper left arm
+    {0,  TORSO_WIDTH/2 - THIGH_THICK, -TORSO_LEN/2, 0}, // upper right leg
+    {5,  0, -LEG_LEN, 0}, // lower right leg
+    {0,  -TORSO_WIDTH/2 + THIGH_THICK, -TORSO_LEN/2, 0}, // upper right leg
+    {7,  0, -LEG_LEN, 0}, // lower right leg
+    {0,  0, TORSO_LEN/2 + HEAD_DIAM/2, 0} // head
   };
 
   struct ShapeDesc {
@@ -556,7 +571,14 @@ static void constructRobot(shared_ptr<SgTransformNode> base, const Cvec3& color)
   ShapeDesc shapeDesc[NUM_SHAPES] = {
     {0, 0,         0, 0, TORSO_WIDTH, TORSO_LEN, TORSO_THICK, g_cube}, // torso
     {1, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper right arm
-    {2, ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // lower right arm
+    {2, ARM_LEN/2, 0, 0, FOREARM_LEN, FOREARM_THICK, ARM_THICK, g_cube}, // lower right arm
+    {3, -ARM_LEN/2, 0, 0, ARM_LEN, ARM_THICK, ARM_THICK, g_cube}, // upper left arm
+    {4, -ARM_LEN/2, 0, 0, FOREARM_LEN, FOREARM_THICK, ARM_THICK, g_cube}, // lower left arm
+    {5, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper right leg
+    {6, 0, -CALF_LEN/2, 0, LEG_THICK, CALF_LEN, CALF_THICK, g_cube}, // lower right leg
+    {7, 0, -LEG_LEN/2, 0, LEG_THICK, LEG_LEN, LEG_THICK, g_cube}, // upper left leg
+    {8, 0, -CALF_LEN/2, 0, LEG_THICK, CALF_LEN, CALF_THICK, g_cube}, // lower left leg
+    {9, 0, HEAD_DIAM/2, 0, HEAD_DIAM, HEAD_DIAM, HEAD_DIAM, g_sphere} // head
   };
 
   shared_ptr<SgTransformNode> jointNodes[NUM_JOINTS];
