@@ -8,7 +8,7 @@ using namespace std::tr1;
 Picker::Picker(const RigTForm& initialRbt, const ShaderState& curSS)
   : drawer_(initialRbt, curSS)
   , idCounter_(0)
-  , srgbFrameBuffer_(g_Gl2Compatible) {} 
+  , srgbFrameBuffer_(!g_Gl2Compatible) {} 
 
 bool Picker::visit(SgTransformNode& node) {
   nodeStack_.push_back(node.shared_from_this());
@@ -23,7 +23,7 @@ bool Picker::postVisit(SgTransformNode& node) {
 bool Picker::visit(SgShapeNode& node) {
   addToMap(++idCounter_, dynamic_pointer_cast<SgRbtNode>(nodeStack_.back()));
   Cvec3 c = idToColor(idCounter_);
-  safe_glUniform3f(drawer_.getCurSS().h_uColor, color[0], color[1], color[2]);
+  safe_glUniform3f(drawer_.getCurSS().h_uIdColor, c[0], c[1], c[2]);
   return drawer_.visit(node);
 }
 
