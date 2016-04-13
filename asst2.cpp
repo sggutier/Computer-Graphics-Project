@@ -247,7 +247,10 @@ static bool mouseDepthPressedP() {
 }
 
 static bool drawArcballP() {
-  return !mouseDepthPressedP() && (g_currentPickedRbtNode==g_skyNode || g_currentPickedRbtNode != getEyeNode());
+  return
+    !mouseDepthPressedP() &&
+    !(g_curEyeN != g_robotCnt && g_currentPickedRbtNode == g_skyNode) &&
+    (getEyeNode()==g_skyNode || g_currentPickedRbtNode != getEyeNode());
 }
 
 static void drawStuff(const ShaderState& curSS, bool picking) {
@@ -263,7 +266,7 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
   RigTForm sphereRbt ;
   if (g_currentPickedRbtNode != g_skyNode) {
     // put sphere on object unless manipulating world - otherwise, put it at the center of the world
-    sphereRbt = getPathAccumRbt(g_world, g_currentPickedRbtNode) ; 
+    sphereRbt = getPathAccumRbt(g_world, g_currentPickedRbtNode);
   }
   //draw cube if manipulating sky camera respect to world coordinate system
   // or manipulating cube respect to other cube
@@ -351,6 +354,9 @@ static void reshape(const int w, const int h) {
 }
 
 static void motion(const int x, const int y) {
+  if (g_curEyeN != g_robotCnt && g_currentPickedRbtNode == g_skyNode) {
+    return;
+  }
   double dx = x - g_mouseClickX;
   double dy = g_windowHeight - y - 1 - g_mouseClickY;
 
@@ -376,12 +382,16 @@ static void motion(const int x, const int y) {
   }
 
   if (g_mouseClickDown) {
-    RigTForm editRbt = RigTForm(getPathAccumRbt(g_world, g_currentPickedRbtNode).getTranslation(),
+    int skyPatch = (g_currentPickedRbtNode == g_skyNode? 1 : 0);
+    RigTForm editRbt = RigTForm(getPathAccumRbt(g_world, g_currentPickedRbtNode, skyPatch).getTranslation(),
                                 getPathAccumRbt(g_world, getEyeNode()).getRotation());
+    // ^ That thing is the matrix centered at the object being manipulated and some rotation convenient to the current view
     RigTForm Cs = getPathAccumRbt(g_world, g_currentPickedRbtNode, 1);
+    // ^ This is the rigid transform of the articulation that is just behind the current object
     g_currentPickedRbtNode->setRbt(doMtoOwrtA(RigTForm(mt_, mr_),
                                               g_currentPickedRbtNode->getRbt(),
                                               inv(Cs)*editRbt));
+    // ^ Gets local rigid transform for currently manipulated object
     glutPostRedisplay(); // we always redraw if we changed the scene
   }
 
