@@ -71,8 +71,8 @@ static bool g_mouseLClickButton, g_mouseRClickButton, g_mouseMClickButton;
 static int g_mouseClickX, g_mouseClickY; // coordinates for mouse click event
 static int g_activeShader = 0;
 
-static const int PICKING_SHADER = 2; // index of the picking shader is g_shaerFiles
 static const int g_numShaders = 3;
+static const int PICKING_SHADER = g_numShaders - 1; // index of the picking shader is g_shaerFiles
 static const char * const g_shaderFiles[g_numShaders][2] = {
   {"./shaders/basic-gl3.vshader", "./shaders/diffuse-gl3.fshader"},
   {"./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader"},
@@ -162,7 +162,7 @@ static const int g_robotCnt = 2;
 static int g_curEyeN = 2;
 static int g_skyPatch = 1; // Set as 1 if manipulating sky-sky frame - 0 if manipulating sky-eye frame - (-1) otherwise
 static double g_arcballScale = 1.0, g_arcballScreenRadius = 1.0;
-static const Cvec3 g_light1(2.0, 3.0, 14.0), g_light2(-2, -3.0, -5.0);  // define two lights positions in world space
+static const Cvec3 g_light1(0.0, 3.0, 14.0);  // define one lights positions in world space
 static Cvec3f g_objectColors[g_robotCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static Cvec3f g_sphereColors = Cvec3f(0, 1, 0);
 
@@ -279,9 +279,7 @@ static void drawStuff(const ShaderState& curSS, bool picking) {
 
 
   const Cvec3 eyeLight1 = Cvec3(invEyeRbt * Cvec4(g_light1, 1)); // g_light1 position in eye coordinates
-  const Cvec3 eyeLight2 = Cvec3(invEyeRbt * Cvec4(g_light2, 1)); // g_light2 position in eye coordinates
   safe_glUniform3f(curSS.h_uLight, eyeLight1[0], eyeLight1[1], eyeLight1[2]);
-  safe_glUniform3f(curSS.h_uLight2, eyeLight2[0], eyeLight2[1], eyeLight2[2]);
 
   if (!picking) {
     Drawer drawer(invEyeRbt, curSS);
@@ -479,7 +477,7 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     }
     break ;
   case 'f':
-    g_activeShader ^= 1;
+    g_activeShader = (g_activeShader+1) % (g_numShaders-1);
     break;
   }
   glutPostRedisplay();
