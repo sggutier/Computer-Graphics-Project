@@ -71,15 +71,19 @@ static bool g_mouseLClickButton, g_mouseRClickButton, g_mouseMClickButton;
 static int g_mouseClickX, g_mouseClickY; // coordinates for mouse click event
 static int g_activeShader = 0;
 
-static const int g_numShaders = 3;
+static const int g_numShaders = 6;
 static const int PICKING_SHADER = g_numShaders - 1; // index of the picking shader is g_shaerFiles
 static const char * const g_shaderFiles[g_numShaders][2] = {
   {"./shaders/basic-gl3.vshader", "./shaders/diffuse-gl3.fshader"},
+  {"./shaders/flat-gl3.vshader",  "./shaders/flat-diffuse-gl3.fshader"},
+  {"./shaders/basic-gl3.vshader", "./shaders/phong-gl3.fshader"},
+  {"./shaders/gourad-gl3.vshader", "./shaders/gourad-gl3.fshader"},
   {"./shaders/basic-gl3.vshader", "./shaders/solid-gl3.fshader"},
   {"./shaders/basic-gl3.vshader", "./shaders/pick-gl3.fshader"}
 };
 static const char * const g_shaderFilesGl2[g_numShaders][2] = {
   {"./shaders/basic-gl2.vshader", "./shaders/diffuse-gl2.fshader"},
+  {"./shaders/basic-gl2.vshader", "./shaders/solid-gl2.fshader"},
   {"./shaders/basic-gl2.vshader", "./shaders/solid-gl2.fshader"},
   {"./shaders/basic-gl2.vshader", "./shaders/pick-gl2.fshader"}
 };
@@ -162,7 +166,7 @@ static const int g_robotCnt = 2;
 static int g_curEyeN = 2;
 static int g_skyPatch = 1; // Set as 1 if manipulating sky-sky frame - 0 if manipulating sky-eye frame - (-1) otherwise
 static double g_arcballScale = 1.0, g_arcballScreenRadius = 1.0;
-static const Cvec3 g_light1(0.0, 3.0, 14.0);  // define one lights positions in world space
+static const Cvec3 g_light1(0.0, 5.0, 5.0);  // define one lights positions in world space
 static Cvec3f g_objectColors[g_robotCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static Cvec3f g_sphereColors = Cvec3f(0, 1, 0);
 
@@ -478,6 +482,9 @@ static void keyboard(const unsigned char key, const int x, const int y) {
     break ;
   case 'f':
     g_activeShader = (g_activeShader+1) % (g_numShaders-1);
+    break;
+  case 'F':
+    g_activeShader = (g_activeShader-1 + (g_numShaders-1)) % (g_numShaders-1);
     break;
   }
   glutPostRedisplay();
