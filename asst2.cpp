@@ -166,7 +166,7 @@ static const int g_robotCnt = 2;
 static int g_curEyeN = 2;
 static int g_skyPatch = 1; // Set as 1 if manipulating sky-sky frame - 0 if manipulating sky-eye frame - (-1) otherwise
 static double g_arcballScale = 1.0, g_arcballScreenRadius = 1.0;
-static const Cvec3 g_light1(0.0, 5.0, 5.0);  // define one lights positions in world space
+static const Cvec3 g_light1(0.0, 2.0, 0.0);  // define one lights positions in world space
 static Cvec3f g_objectColors[g_robotCnt] = {Cvec3f(1, 0, 0), Cvec3f(0, 0, 1)};
 static Cvec3f g_sphereColors = Cvec3f(0, 1, 0);
 
